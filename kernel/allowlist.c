@@ -265,56 +265,26 @@ bool __ksu_is_allow_uid(uid_t uid)
 {
 	int i;
 
-	if (unlikely(uid == 0)) {
-		// already root, but only allow our domain.
-		return is_ksu_domain();
+	for (i = 0; i < allow_list_pointer; i++) {
+		if (allow_list_arr[i] == uid)
+			return false;
 	}
 
-	if (forbid_system_uid(uid)) {
-		// do not bother going through the list if it's system
-		return false;
-	}
-
-	if (likely(ksu_is_manager_uid_valid()) && unlikely(ksu_get_manager_uid() == uid)) {
-		// manager is always allowed!
-		return true;
-	}
-
-	if (likely(uid <= BITMAP_UID_MAX)) {
-		return !!(allow_list_bitmap[uid / BITS_PER_BYTE] & (1 << (uid % BITS_PER_BYTE)));
-	} else {
-		for (i = 0; i < allow_list_pointer; i++) {
-			if (allow_list_arr[i] == uid)
-				return true;
-		}
-	}
-
-	return false;
+	return true;
 }
 
+//魔改为名白单 反向 给root的为umount
 bool ksu_uid_should_umount(uid_t uid)
 {
 	struct app_profile profile = { .current_uid = uid };
-	if (likely(ksu_is_manager_uid_valid()) && unlikely(ksu_get_manager_uid() == uid)) {
-		// we should not umount on manager!
-		return false;
-	}
-	bool found = ksu_get_app_profile(&profile);
-	if (!found) {
-		// no app profile found, it must be non root app
-		return default_non_root_profile.umount_modules;
-	}
+
 	if (profile.allow_su) {
 		// if found and it is granted to su, we shouldn't umount for it
-		return false;
-	} else {
-		// found an app profile
-		if (profile.nrp_config.use_default) {
-			return default_non_root_profile.umount_modules;
-		} else {
-			return profile.nrp_config.profile.umount_modules;
-		}
+		return true;
 	}
+
+	return false;
+
 }
 
 struct root_profile *ksu_get_root_profile(uid_t uid)
